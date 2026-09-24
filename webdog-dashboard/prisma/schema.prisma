@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum IncomeType {
+  SEO_RETAINER
+  ONE_OFF_PROJECT
+  WEBSITE
+  ADS
+  OTHER
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+  ONE_OFF
+}
+
+model Client {
+  id               String        @id @default(cuid())
+  name             String
+  status           ClientStatus  @default(ACTIVE)
+  billable         Boolean       @default(true) // false = pro-bono / volunteer — excluded
+  // from capacity + blended-rate math, still trackable for time & value
+  monthlyHours     Float         @default(0) // hours/month this client needs (capacity planning)
+  rate             Float         @default(0) // £/hr — agreed rate, or notional rate if !billable
+  startDate        DateTime      @default(now()) // when the partnership began
+  endDate          DateTime? // set when status becomes ENDED — drives churn/tenure stats
+  trelloCardId     String? // this client's card on the Trello board (not the whole board)
+  website          String?
+  googleDriveUrl   String?
+  dataStudioUrl    String?
+  searchConsoleUrl String?
+  googleAdsUrl     String?
+  analyticsUrl     String?
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  incomeEntries    IncomeEntry[]
+  timeEntries      TimeEntry[]
+}
+
+model IncomeEntry {
+  id        String     @id @default(cuid())
+  client    Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientId  String?
+  label     String // e.g. "September retainer", "New site build"
+  type      IncomeType
+  amount    Float // GBP
+  date      DateTime // date income is attributed to (for monthly rollups)
+  recurring Boolean    @default(false)
+  createdAt DateTime   @default(now())
+}
+
+model TimeEntry {
+  id       String   @id @default(cuid())
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+  hours    Float
+  rate     Float // snapshot of the client's rate at logging time (billable or notional)
+  date     DateTime
+  note     String?
+  createdAt DateTime @default(now())
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  label      String
+  category   String // e.g. "Software", "Subcontractor", "Marketing", "Travel", "Tech stack (auto)"
+  amount     Float
+  date       DateTime
+  recurring  Boolean  @default(false)
+  auto       Boolean  @default(false) // true = generated from a TechTool, not entered by hand
+  techToolId String?
+  createdAt  DateTime @default(now())
+}
+
+model TechTool {
+  id           String       @id @default(cuid())
+  name         String
+  category     String // Domain / Hosting / CMS / Software subscription / Other
+  cost         Float
+  billingCycle BillingCycle @default(MONTHLY)
+  renewsOn     DateTime // anchor date; recurs monthly/annually from here
+  url          String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model StaffMember {
+  id             String   @id @default(cuid())
+  name           String
+  availableHours Float // hours/month available to bill (used as a manual figure,
+  // or as the working-hours ceiling if calendarLinked is true)
+  hourlyCost     Float? // optional, what they cost per hour (e.g. Jatin's rate)
+  calendarLinked Boolean  @default(false) // if true, availableHours is netted
+  // down by this month's Google Calendar meeting time on the overview
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Single-row table — this app supports one connected Google account
+// (yours). Tokens live here rather than in an env var so you can
+// connect/disconnect from the UI without a redeploy.
+model GoogleAccount {
+  id           String   @id @default("default")
+  email        String?
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  updatedAt    DateTime @updatedAt
+}
