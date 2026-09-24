@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthlyEquivalent } from "@/lib/techstack";
 
+export const dynamic = "force-dynamic";
+
 // Called by Vercel Cron on the 1st of every month (see vercel.json).
 // Idempotent: safe to call more than once in the same month — it won't
 // double-post for a tool it's already logged this month.

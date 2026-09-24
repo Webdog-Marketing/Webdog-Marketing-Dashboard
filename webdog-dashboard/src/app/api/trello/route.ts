@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cardProgress, configuredBoardIds, fetchBoardData, trelloConfigured } from "@/lib/trello";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   if (!trelloConfigured()) {
     return NextResponse.json({ configured: false, boards: [] });

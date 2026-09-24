@@ -4,6 +4,8 @@ import { cardProgress, configuredBoardIds, fetchBoardData, trelloConfigured } fr
 import { getMonthlyAvailability, googleConfigured } from "@/lib/google";
 import { daysUntil, nextRenewal } from "@/lib/techstack";
 
+export const dynamic = "force-dynamic";
+
 const TYPE_LABELS: Record<string, string> = {
   SEO_RETAINER: "SEO retainer",
   ONE_OFF_PROJECT: "One-off project",

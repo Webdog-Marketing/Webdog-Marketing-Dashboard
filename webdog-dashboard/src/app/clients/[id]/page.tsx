@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { cardProgress, fetchCard, trelloConfigured } from "@/lib/trello";
 
+export const dynamic = "force-dynamic";
+
 const LINK_FIELDS: { key: keyof NonNullable<Awaited<ReturnType<typeof getClient>>>; label: string }[] = [
   { key: "website", label: "Website" },
   { key: "googleDriveUrl", label: "Google Drive folder" },
