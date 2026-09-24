@@ -329,7 +329,9 @@ export default function ClientsPage() {
                   Connected. This month:{" "}
                   {calendar.error
                     ? "couldn't reach Google just now."
-                    : `${calendar.workingHours}h working hours, ${calendar.busyHours}h in meetings, ${calendar.netAvailable}h net available.`}
+                    : `${calendar.busyHours}h booked in meetings so far.`}{" "}
+                  For anyone with &quot;use calendar&quot; ticked below, that gets subtracted
+                  from their target hours, not from a full working month.
                 </div>
                 <button className="btn secondary" onClick={disconnectCalendar}>Disconnect</button>
               </div>

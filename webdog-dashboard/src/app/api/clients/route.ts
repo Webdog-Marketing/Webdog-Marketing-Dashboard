@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       searchConsoleUrl: body.searchConsoleUrl || null,
       googleAdsUrl: body.googleAdsUrl || null,
       analyticsUrl: body.analyticsUrl || null,
+      changelogUrl: body.changelogUrl || null,
       notes: body.notes || null,
     },
   });

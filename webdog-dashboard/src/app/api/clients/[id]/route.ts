@@ -40,6 +40,7 @@ export async function PATCH(
     searchConsoleUrl: body.searchConsoleUrl,
     googleAdsUrl: body.googleAdsUrl,
     analyticsUrl: body.analyticsUrl,
+    changelogUrl: body.changelogUrl,
     notes: body.notes,
   };
 

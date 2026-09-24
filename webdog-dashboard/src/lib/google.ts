@@ -57,7 +57,7 @@ export async function saveTokensFromCallback(
   });
 }
 
-async function getValidAccessToken(): Promise<string | null> {
+export async function getValidAccessToken(): Promise<string | null> {
   const account = await prisma.googleAccount.findUnique({
     where: { id: ACCOUNT_ID },
   });
@@ -169,4 +169,101 @@ export async function getMonthlyAvailability(): Promise<MonthlyAvailability> {
     busyHours: round1(busyHours),
     netAvailable: round1(Math.max(0, workingHours - busyHours)),
   };
+}
+
+export type CalendarEvent = {
+  id: string;
+  summary: string;
+  start: string; // ISO datetime, or a bare date "2026-09-30" for all-day events
+  end: string;
+  allDay: boolean;
+};
+
+export type UpcomingDay = {
+  date: string; // YYYY-MM-DD, local-ish (from the event's own date)
+  label: string; // e.g. "Mon 29 Sep"
+  events: CalendarEvent[];
+};
+
+export type UpcomingSummary =
+  | { connected: false }
+  | { connected: true; error: true }
+  | { connected: true; error?: false; days: UpcomingDay[] };
+
+// Actual event titles/times for the next `days` days (default 14), grouped
+// by calendar day — for a quick "what's coming up" glance, separate from
+// the aggregate hours math above.
+export async function getUpcomingEvents(days = 14): Promise<UpcomingSummary> {
+  const token = await getValidAccessToken();
+  if (!token) return { connected: false };
+
+  const timeZone = process.env.WORK_TIMEZONE || "Europe/London";
+  const now = new Date();
+  const timeMin = now.toISOString();
+  const timeMax = new Date(now.getTime() + days * 86_400_000).toISOString();
+
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "100",
+  });
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    }
+  );
+
+  if (!res.ok) return { connected: true, error: true };
+  const data = await res.json();
+  const items: {
+    id: string;
+    summary?: string;
+    status?: string;
+    start: { dateTime?: string; date?: string };
+    end: { dateTime?: string; date?: string };
+  }[] = data.items ?? [];
+
+  const byDay = new Map<string, UpcomingDay>();
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(now.getTime() + i * 86_400_000);
+    const key = d.toLocaleDateString("en-CA", { timeZone }); // YYYY-MM-DD
+    const label = d.toLocaleDateString("en-GB", {
+      timeZone,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    byDay.set(key, { date: key, label, events: [] });
+  }
+
+  for (const item of items) {
+    if (item.status === "cancelled") continue;
+    const allDay = !item.start.dateTime;
+    const startIso = item.start.dateTime ?? item.start.date ?? "";
+    const endIso = item.end.dateTime ?? item.end.date ?? "";
+    if (!startIso) continue;
+
+    const key = allDay
+      ? startIso
+      : new Date(startIso).toLocaleDateString("en-CA", { timeZone });
+
+    const bucket = byDay.get(key);
+    if (!bucket) continue; // outside our day window (rare edge case)
+
+    bucket.events.push({
+      id: item.id,
+      summary: item.summary || "(no title)",
+      start: startIso,
+      end: endIso,
+      allDay,
+    });
+  }
+
+  return { connected: true, days: Array.from(byDay.values()) };
 }

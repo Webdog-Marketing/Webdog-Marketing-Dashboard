@@ -45,6 +45,7 @@ model Client {
   searchConsoleUrl String?
   googleAdsUrl     String?
   analyticsUrl     String?
+  changelogUrl     String? // e.g. a Google Sheet tracking updates made for this client
   notes            String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt

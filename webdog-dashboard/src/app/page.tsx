@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import IncomeByTypeChart from "@/components/IncomeByTypeChart";
 import { cardProgress, configuredBoardIds, fetchBoardData, trelloConfigured } from "@/lib/trello";
-import { getMonthlyAvailability, googleConfigured } from "@/lib/google";
+import { getMonthlyAvailability, getUpcomingEvents, googleConfigured } from "@/lib/google";
 import { daysUntil, nextRenewal } from "@/lib/techstack";
 
 export const dynamic = "force-dynamic";
@@ -42,10 +42,12 @@ export default async function DashboardPage() {
 
   const calendarConfigured = googleConfigured();
   const availability = calendarConfigured ? await getMonthlyAvailability() : { connected: false as const };
+  const upcoming = calendarConfigured ? await getUpcomingEvents(14) : { connected: false as const };
 
   const effectiveHoursFor = (s: (typeof staff)[number]) => {
     if (s.calendarLinked && availability.connected && !("error" in availability && availability.error)) {
-      return (availability as { netAvailable: number }).netAvailable;
+      const busy = (availability as { busyHours: number }).busyHours;
+      return Math.max(0, s.availableHours - busy);
     }
     return s.availableHours;
   };
@@ -184,26 +186,68 @@ export default async function DashboardPage() {
         ) : "error" in availability && availability.error ? (
           <div className="empty-state">Couldn&apos;t reach Google Calendar just now — try again shortly.</div>
         ) : (
-          <div className="stat-row">
-            <div>
-              <div className="summary-label">Working hours (Mon–Fri)</div>
-              <div className="summary-value numeral" style={{ fontSize: 22 }}>
-                {(availability as { workingHours: number }).workingHours}h
+          <>
+            <div className="stat-row">
+              <div>
+                <div className="summary-label">Working hours (Mon–Fri)</div>
+                <div className="summary-value numeral" style={{ fontSize: 22 }}>
+                  {(availability as { workingHours: number }).workingHours}h
+                </div>
+              </div>
+              <div>
+                <div className="summary-label">Booked in meetings</div>
+                <div className="summary-value numeral" style={{ fontSize: 22 }}>
+                  {(availability as { busyHours: number }).busyHours}h
+                </div>
               </div>
             </div>
-            <div>
-              <div className="summary-label">Booked in meetings</div>
-              <div className="summary-value numeral" style={{ fontSize: 22 }}>
-                {(availability as { busyHours: number }).busyHours}h
-              </div>
+            <div className="summary-note" style={{ marginTop: 10 }}>
+              For anyone with &quot;use calendar&quot; ticked, their target hours above are
+              reduced by the meeting hours shown here — not by this raw calendar total.
             </div>
-            <div>
-              <div className="summary-label">Net available</div>
-              <div className="summary-value numeral" style={{ fontSize: 22 }}>
-                {(availability as { netAvailable: number }).netAvailable}h
-              </div>
-            </div>
+          </>
+        )}
+      </div>
+
+      <div className="panel" style={{ marginBottom: 28 }}>
+        <p className="panel-title">Upcoming — next 2 weeks</p>
+        {!calendarConfigured || !upcoming.connected ? (
+          <div className="empty-state">
+            {!calendarConfigured
+              ? "Connect Google Calendar to see what's coming up."
+              : "Not connected yet — head to Clients & capacity to connect your calendar."}
           </div>
+        ) : "error" in upcoming && upcoming.error ? (
+          <div className="empty-state">Couldn&apos;t reach Google Calendar just now — try again shortly.</div>
+        ) : (
+          <table>
+            <tbody>
+              {("days" in upcoming ? upcoming.days : []).map((day) => (
+                <tr key={day.date}>
+                  <td style={{ whiteSpace: "nowrap", color: "var(--text-muted)", fontSize: 13, verticalAlign: "top" }}>
+                    {day.label}
+                  </td>
+                  <td style={{ fontSize: 13 }}>
+                    {day.events.length === 0 ? (
+                      <span style={{ color: "var(--text-muted)" }}>—</span>
+                    ) : (
+                      day.events
+                        .map((e) =>
+                          e.allDay
+                            ? e.summary
+                            : `${new Date(e.start).toLocaleTimeString("en-GB", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                timeZone: process.env.WORK_TIMEZONE || "Europe/London",
+                              })} ${e.summary}`
+                        )
+                        .join(" · ")
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 

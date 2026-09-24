@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { cardProgress, fetchCard, trelloConfigured } from "@/lib/trello";
+import ClientEditPanel from "@/components/ClientEditPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ const LINK_FIELDS: { key: keyof NonNullable<Awaited<ReturnType<typeof getClient>
   { key: "searchConsoleUrl", label: "Google Search Console" },
   { key: "googleAdsUrl", label: "Google Ads" },
   { key: "analyticsUrl", label: "Google Analytics" },
+  { key: "changelogUrl", label: "ChangeLog" },
 ];
 
 async function getClient(id: string) {
@@ -30,13 +32,10 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const monthlyValue = client.monthlyHours * client.rate;
 
   let trelloProgress: { done: number; total: number } | null = null;
-  let trelloUrl: string | null = null;
+  const trelloViewUrl = client.trelloCardId ? `https://trello.com/c/${client.trelloCardId}` : null;
   if (client.trelloCardId && trelloConfigured()) {
     const card = await fetchCard(client.trelloCardId);
-    if (card) {
-      trelloProgress = cardProgress(card);
-      trelloUrl = card.shortUrl;
-    }
+    if (card) trelloProgress = cardProgress(card);
   }
 
   return (
@@ -79,33 +78,35 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         </div>
       </div>
 
+      <ClientEditPanel client={client} />
+
       {client.trelloCardId && (
         <div className="panel" style={{ marginBottom: 24 }}>
           <p className="panel-title">Trello card</p>
-          {trelloProgress ? (
-            <>
-              <div className="progress-row" style={{ marginBottom: 0 }}>
-                <span>Checklist</span>
-                <div className="progress-track">
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${trelloProgress.total > 0 ? (trelloProgress.done / trelloProgress.total) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-                <span className="numeral progress-count">
-                  {trelloProgress.done}/{trelloProgress.total}
-                </span>
+          {trelloProgress && (
+            <div className="progress-row" style={{ marginBottom: 10 }}>
+              <span>Checklist</span>
+              <div className="progress-track">
+                <div
+                  className="progress-fill"
+                  style={{
+                    width: `${trelloProgress.total > 0 ? (trelloProgress.done / trelloProgress.total) * 100 : 0}%`,
+                  }}
+                />
               </div>
-              {trelloUrl && (
-                <div style={{ marginTop: 10 }}>
-                  <a href={trelloUrl} target="_blank" rel="noreferrer">Open card ↗</a>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="empty-state">Couldn&apos;t reach this card just now.</div>
+              <span className="numeral progress-count">
+                {trelloProgress.done}/{trelloProgress.total}
+              </span>
+            </div>
+          )}
+          {!trelloProgress && !trelloConfigured() && (
+            <div className="summary-note" style={{ marginBottom: 10 }}>
+              Checklist progress needs Trello connected (TRELLO_API_KEY/TRELLO_TOKEN) — the
+              card link below works regardless.
+            </div>
+          )}
+          {trelloViewUrl && (
+            <a href={trelloViewUrl} target="_blank" rel="noreferrer">Open card ↗</a>
           )}
         </div>
       )}
